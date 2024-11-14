@@ -10,7 +10,7 @@
 from setuptools import find_packages, setup
 
 install_requirements = [
-    'datacube[performance,s3]>=1.9.0-rc9',
+    'datacube[performance,s3]>=1.9.0-rc11',
     'flask',
     'requests',
     'affine',
@@ -22,6 +22,7 @@ install_requirements = [
     'importlib_metadata',
     'matplotlib',
     'pyparsing',
+    'antimeridian',
     'numpy>=1.22',
     'scipy',
     'Pillow>=10.2.0',
@@ -51,17 +52,15 @@ test_requirements = [
 ]
 
 dev_requirements = [
-    'pydevd-pycharm~=232.10072.31',
+    'pydevd-pycharm~=242.23339.19',
     'pylint',
     'sphinx_click',
     'pre-commit',
-    'pipdeptree',
     'mypy',
     'flake8',
     'types-pytz',
     'types-python-dateutil',
     'types-requests',
-
 ]
 
 operational_requirements = [

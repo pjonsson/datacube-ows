@@ -26,6 +26,7 @@ from datacube_ows.styles import StyleDef
 from datacube_ows.styles.expression import ExpressionException
 from datacube_ows.utils import default_to_utc, find_matching_date
 
+
 RESAMPLING_METHODS = {
     'nearest': Resampling.nearest,
     'cubic': Resampling.cubic,
@@ -67,23 +68,25 @@ def _get_geobox_xy(args, crs):
     return minx, miny, maxx, maxy
 
 
-def _get_geobox(args, src_crs, dst_crs=None):
+def _get_geobox(args, crs):
     width = int(args['width'])
     height = int(args['height'])
-    minx, miny, maxx, maxy = _get_geobox_xy(args, src_crs)
+    minx, miny, maxx, maxy = _get_geobox_xy(args, crs)
 
     if minx == maxx or miny == maxy:
         raise WMSException("Bounding box must enclose a non-zero area")
-    if dst_crs is not None:
-        minx, miny, maxx, maxy = _bounding_pts(
-            minx, miny,
-            maxx, maxy,
-            src_crs, dst_crs=dst_crs
-        )
 
-    out_crs = src_crs if dst_crs is None else dst_crs
+    if crs.epsg == 3857 and (maxx < -13_000_000 or minx > 13_000_000):
+            # EPSG:3857 query AND closer to the anti-meridian than the prime meridian:
+            # re-project to epsg:3832 (Pacific Web-Mercator)
+            ll = geom.point(x=minx, y=miny, crs=crs).to_crs("epsg:3832")
+            ur = geom.point(x=maxx, y=maxy, crs=crs).to_crs("epsg:3832")
+            minx, miny = ll.coords[0]
+            maxx, maxy = ur.coords[0]
+            crs = geom.CRS("epsg:3832")
+
     return create_geobox(
-        out_crs,
+        crs,
         minx, miny, maxx, maxy,
         width, height
     )
@@ -106,11 +109,11 @@ def zoom_factor(args, crs):
     # Project to a geographic coordinate system
     # This is why we can't just use the regular geobox.  The scale needs to be
     # "standardised" in some sense, not dependent on the CRS of the request.
-    geo_crs = geom.CRS("EPSG:4326")
+    # TODO: can we do better in polar regions?
     minx, miny, maxx, maxy = _bounding_pts(
         minx, miny,
         maxx, maxy,
-        crs, dst_crs=geo_crs
+        crs, dst_crs="epsg:4326"
     )
     # Create geobox affine transformation (N.B. Don't need an actual Geobox)
     affine = Affine.translation(minx, miny) * Affine.scale((maxx - minx) / width, (maxy - miny) / height)
@@ -312,6 +315,11 @@ class GetParameters():
         self.geometry = _get_polygon(args, self.crs)
         # BBox, height and width parameters
         self.geobox = _get_geobox(args, self.crs)
+        # Web-merc antimeridian hack:
+        if self.geobox.crs != self.crs:
+            self.crs = self.geobox.crs
+            self.geometry = self.geometry.to_crs(self.crs)
+
         # Time parameter
         self.times = get_times(args, self.layer)
 
@@ -489,8 +497,7 @@ def solar_correct_data(data, dataset):
     native_x = (dataset.bounds.right + dataset.bounds.left) / 2.0
     native_y = (dataset.bounds.top + dataset.bounds.bottom) / 2.0
     pt = geom.point(native_x, native_y, dataset.crs)
-    crs_geo = geom.CRS("EPSG:4326")
-    geo_pt = pt.to_crs(crs_geo)
+    geo_pt = pt.to_crs("epsg:4326")
     data_time = dataset.center_time.astimezone(utc)
     data_lon, data_lat = geo_pt.coords[0]
 

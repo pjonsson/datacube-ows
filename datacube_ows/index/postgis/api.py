@@ -14,6 +14,7 @@ from uuid import UUID
 from odc.geo import Geometry, CRS
 from datacube import Datacube
 from datacube.model import Product, Dataset, Range
+from antimeridian import fix_shape
 
 from datacube_ows.ows_configuration import OWSNamedLayer
 from datacube_ows.index.api import OWSAbstractIndex, OWSAbstractIndexDriver, LayerSignature, LayerExtent, TimeSearchTerm
@@ -61,7 +62,15 @@ class OWSPostgisIndex(OWSAbstractIndex):
                ) -> dict[str, Any]:
         query: dict[str, Any] = {}
         if geom:
-            query["geopolygon"] = self._prep_geom(layer, geom)
+            if geom.crs and geom.crs in layer.dc.index.spatial_indexes():
+                query["geopolygon"] = geom
+            else:
+                # Default to 4326 and take a long hard look at yourself.
+                prepared_geom = self._prep_geom(layer, geom)
+                assert prepared_geom is not None
+                geopoly = prepared_geom.to_crs("epsg:4326")
+                geopoly = Geometry(fix_shape(geopoly.geom), crs="epsg:4326")
+                query["geopolygon"] = geopoly
         if products is not None:
             query["product"] = [p.name for p in products]
         if times is not None:

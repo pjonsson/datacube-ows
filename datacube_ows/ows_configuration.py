@@ -396,6 +396,9 @@ class OWSFolder(OWSLayer):
         self.unready_layers = still_unready
         super().make_ready(*args, **kwargs)
 
+    def __repr__(self) -> str:
+        return f"OWS Folder <{self.title}>"
+
 
 class TimeRes(Enum):
     SUBDAY = "subday"
@@ -1041,6 +1044,9 @@ class OWSNamedLayer(OWSExtensibleConfigEntry, OWSLayer):
         except KeyError:
             raise OWSEntryNotFound(f"Layer {keyvals['layer']} not found")
 
+    def __repr__(self) -> str:
+        return f"OWS Layer <{self.name}>"
+
 
 class OWSProductLayer(OWSNamedLayer):
     multi_product = False
@@ -1311,7 +1317,7 @@ class OWSConfig(OWSMetadataConfig):
         try:
             self.dc: Datacube = Datacube(env=self.default_env, app=self.odc_app)
         except Exception as e:
-            _LOG.error("ODC initialisation failed: %s", str(e))
+            _LOG.error("ODC initialisation of env %s failed: %s", self.default_env._name, str(e))
             raise ODCInitException(e)
         if self.msg_file_name:
             try:
@@ -1432,6 +1438,19 @@ class OWSConfig(OWSMetadataConfig):
             self.default_geographic_CRS = "urn:ogc:def:crs:OGC:1.3:CRS84"
         else:
             self.default_geographic_CRS = geographic_CRSs[0]
+
+        if "EPSG:3857" not in self.published_CRSs:
+            _LOG.warning("EPSG:3857 (Web mercator) is not a published CRS")
+        elif "EPSG:3832" not in self.published_CRSs:
+            # Have web merc but not Pacific Web merc - just add it silently.
+            self.published_CRSs["EPSG:3832"] = {
+                "geographic": False,
+                "horizontal_coord": "x",
+                "vertical_coord": "y",
+                "vertical_coord_first": False,
+                "gml_name": make_gml_name("EPSG:3832"),
+                "alias_of": None
+            }
 
         for alias, alias_def in CRS_aliases.items():
             target_crs = cast(str, alias_def["alias"])
