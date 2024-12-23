@@ -4,7 +4,8 @@ name: Prod dockercompose test
 on:
   pull_request:
     branches:
-      - 'master'
+      - 'develop'
+      - 'develop-1.9'
     paths:
       - '**'
       - '!docs/**'
@@ -16,7 +17,8 @@ on:
 
   push:
     branches:
-      - 'master'
+      - 'develop'
+      - 'develop-1.9'
     paths:
       - '**'
       - '!docs/**'
@@ -29,6 +31,12 @@ on:
 env:
   ORG: opendatacube
   IMAGE: ows
+
+# When a PR is updated, cancel the jobs from the previous version. Merges
+# do not define head_ref, so use run_id to never cancel those jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   prod-docker-compose-tests:
