@@ -638,7 +638,7 @@ class OWSExtensibleConfigEntry(OWSIndexedConfigEntry):
 
     def __init__(
         self,
-        cfg: RAW_CFG,
+        cfg: CFG_DICT,
         keyvals: dict[str, str],
         global_cfg: "datacube_ows.ows_configuration.OWSConfig",
         *args,
@@ -656,15 +656,20 @@ class OWSExtensibleConfigEntry(OWSIndexedConfigEntry):
         :param keyval_defaults: (optional) Dictionary of keyword defaults
         :param expanded: (optional, defaults to False) If true, assume expansion has already been applied.
         """
-        if not expanded:
-            cfg = self.expand_inherit(
-                cast(CFG_DICT, cfg),
+        super().__init__(
+            cfg
+            if expanded
+            else self.expand_inherit(
+                cfg,
                 global_cfg,
                 keyval_subs=keyval_subs,
                 keyval_defaults=keyval_defaults,
-            )
-
-        super().__init__(cfg, keyvals, global_cfg=global_cfg, *args, **kwargs)
+            ),
+            keyvals,
+            global_cfg=global_cfg,
+            *args,
+            **kwargs,
+        )
 
     @classmethod
     def expand_inherit(
